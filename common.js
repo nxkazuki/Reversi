@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 	//コマ色の定義
 	var EMPTY = 0;
 	var BLACK = 1;
@@ -211,11 +211,12 @@
 	
 	
 	//すでにコマがあるかチェックする関数
+	//修正: マスが空の場合にtrueを返すようにした
 	function checkPiece(banmen,x,y){
-		var result;
-		if(banmen[x][y] != EMPTY)
-			result = false;
-	return result;
+		if(banmen[x][y] == EMPTY)
+			return true;
+		else
+			return false;
 	}
 	
 	
@@ -573,6 +574,5 @@
 
 
 
-
 	
-//-->
+//--> 
