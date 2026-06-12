@@ -1,0 +1,146 @@
+﻿<html>
+<head>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=-1, maximum-scale=1">
+<title>JavaScript REVERSI</title>
+<script language="JavaScript" src="prototype-1.6.0.2.js"></script>
+<script language="JavaScript" src="common.js"></script>
+<script language="JavaScript" src="hyoka.js"></script>
+<script language="JavaScript" src="com.js"></script>
+<script language="JavaScript" src="joseki.js"></script>
+</head>
+<body bgcolor="#CCCCCC">
+
+<table bgcolor="#000000" width="400" border="0" bordercolor="#000000" cellspacing="0">
+<tr>
+<td colspan=9 bgcolor="000099" align="center">
+<font color="#FFFFFF">JavaScript REVERSI</font>
+</td>
+</tr>
+<tr>
+<td>　</td>
+<td align="center" valign="middle"><font color="#FFFFFF">a</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">b</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">c</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">d</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">e</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">f</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">g</font></td>
+<td align="center" valign="middle"><font color="#FFFFFF">h</font></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">1</font></td>
+<td><a href="javaScript:putPiece(cell,piece,1,1)"><div id=11><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,2)"><div id=12><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,3)"><div id=13><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,4)"><div id=14><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,5)"><div id=15><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,6)"><div id=16><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,7)"><div id=17><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,1,8)"><div id=18><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">2</font></td>
+<td><a href="javaScript:putPiece(cell,piece,2,1)"><div id=21><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,2)"><div id=22><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,3)"><div id=23><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,4)"><div id=24><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,5)"><div id=25><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,6)"><div id=26><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,7)"><div id=27><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,2,8)"><div id=28><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">3</font></td>
+<td><a href="javaScript:putPiece(cell,piece,3,1)"><div id=31><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,2)"><div id=32><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,3)"><div id=33><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,4)"><div id=34><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,5)"><div id=35><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,6)"><div id=36><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,7)"><div id=37><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,3,8)"><div id=38><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">4</font></td>
+<td><a href="javaScript:putPiece(cell,piece,4,1)"><div id=41><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,2)"><div id=42><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,3)"><div id=43><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,4)"><div id=44><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,5)"><div id=45><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,6)"><div id=46><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,7)"><div id=47><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,4,8)"><div id=48><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">5</font></td>
+<td><a href="javaScript:putPiece(cell,piece,5,1)"><div id=51><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,2)"><div id=52><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,3)"><div id=53><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,4)"><div id=54><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,5)"><div id=55><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,6)"><div id=56><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,7)"><div id=57><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,5,8)"><div id=58><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">6</font></td>
+<td><a href="javaScript:putPiece(cell,piece,6,1)"><div id=61><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,2)"><div id=62><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,3)"><div id=63><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,4)"><div id=64><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,5)"><div id=65><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,6)"><div id=66><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,7)"><div id=67><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,6,8)"><div id=68><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">7</font></td>
+<td><a href="javaScript:putPiece(cell,piece,7,1)"><div id=71><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,2)"><div id=72><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,3)"><div id=73><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,4)"><div id=74><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,5)"><div id=75><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,6)"><div id=76><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,7)"><div id=77><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,7,8)"><div id=78><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td align="center" valign="middle"><font color="#FFFFFF">8</font></td>
+<td><a href="javaScript:putPiece(cell,piece,8,1)"><div id=81><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,2)"><div id=82><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,3)"><div id=83><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,4)"><div id=84><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,5)"><div id=85><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,6)"><div id=86><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,7)"><div id=87><img src="image/0.png" border=0></div></a></td>
+<td><a href="javaScript:putPiece(cell,piece,8,8)"><div id=88><img src="image/0.png" border=0></div></a></td>
+</tr>
+<tr>
+<td colspan=9 bgcolor=navy>
+<font color="#FFFFFF"><div id="container">開始ボタンを押してください。</div></font>
+</td>
+</tr>
+<tr>
+<td></td>
+<td colspan=8 valign="middle">
+<form name="control">
+<font color="#FFFFFF">
+<input type="radio" name="pcolor" value="BLACK" CHECKED>先行：黒 
+<input type="radio" name="pcolor" value="WHITE">後攻：白　 
+<input type="checkbox"  name="disecell" CHECKED>着手可能手を表示
+<br>
+<select name="level">
+	<option value="0">【難易度：低】ランダムに指す
+	<option value="1">【難易度：中】擬似作者
+	<option value="2">【難易度：高】試験中
+</select>
+<input type="button" value="開始" onClick="gameStart(cell,piece)">
+<input type="reset" value="リセット" onClick="location.reload()">
+</font>
+</form>
+</td>
+</tr>
+</table>
+</body>
+</html>
