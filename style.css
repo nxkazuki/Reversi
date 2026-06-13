@@ -371,3 +371,51 @@ select:focus {
         padding: 10px;
     }
 }
+
+/* ============================================
+   Game Pieces & Hints (Custom additions)
+   ============================================ */
+
+.disc {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease;
+}
+
+.disc.black {
+    background: radial-gradient(circle at 30% 30%, #4f4f4f 0%, #000000 80%, #111111 100%);
+    border: 1px solid #111;
+}
+
+.disc.white {
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #e0e0e0 70%, #d5d5d5 100%);
+    border: 1px solid #dcdcdc;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2), inset 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.board-cell.legal-move::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.9);
+        opacity: 0.4;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(0.9);
+        opacity: 0.4;
+    }
+}
