@@ -65,4 +65,41 @@ const joseki = [
   // ==================== weight 1（避けるべきor特殊） ====================
   { move: "F5d6C3d3C4f4C5b3C2e3D2c6B4a3", weight: 1 }, // 古い奇襲
   { move: "F5f6E6f4E3c5C4e7G4g3G5f3G6d6E2h5F7", weight: 1 }
+
+  // ==================== 追加強化分（Tiger / Buffalo / Rose など） ====================
+
+  // Tiger 系 追加（王道・長手順）
+  { move: "F5d6C3d3C4f4C5b3C2b4E3e6C6f6A5a4B5a6D7c7", weight: 3 },
+  { move: "F5d6C3d3C4f4C5b3C2b4E3e6C6f6A5a4B5a6D7c7E7e8", weight: 3 },
+  { move: "F5d6C3d3C4b3C6b6D7e8C2e6F6", weight: 3 },
+
+  // Buffalo / 牛進行 追加
+  { move: "F5d6C3d3C4f4F6g6E6d7E7c5B4c6", weight: 3 },
+  { move: "F5d6C3d3C4f4F6g6E6d7F3c5D2c6B4g5", weight: 3 },
+  { move: "F5d6C3d3C4f4F6g6E6d7E7c5B5c6", weight: 3 },
+
+  // Rose / ローズ進行
+  { move: "F5d6C5f4E3c6D3e6F3d7C4c3B3b4", weight: 3 },
+  { move: "F5d6C5f4E3c6D3e6F3d7C7b6D2", weight: 3 },
+  { move: "F5d6C5f4E3c6D3e6F6d7", weight: 3 },
+
+  // Heath / Tobidashi（飛び出し）
+  { move: "F5f6E6f4E3c5G5d3D6f7C4e2", weight: 3 },
+  { move: "F5f6E6f4E3c5G5d6G6h6F7d3", weight: 3 },
+
+  // Shrimp / その他有力進行
+  { move: "F5d6C3d3C4f4C5b3C2e6", weight: 2 },
+  { move: "F5f6E6f4E3c5C4e7G4f3G5d3D6", weight: 3 },
+  { move: "F5d6C3d3C4f4F6g6E6d7F3c5G5", weight: 3 },
+
+  // より長い中盤寄り定石（多様性向上）
+  { move: "F5d6C3d3C4f4C5b3C2b4E3e6C6f6A5a4B5a6D7c7E7e8B6d8", weight: 3 },
+  { move: "F5f6E6f4E3c5G5g3G4f3G6d3F2h4E2h5F7g5G7", weight: 3 },
+  { move: "F5d6C3d3C4f4F6g6E6d7E7c5B4c6B3d2C2", weight: 3 },
+
+  // weight 2 の標準変化（選択肢を増やす）
+  { move: "F5d6C3d3C4f4C5b3C2b4E3e6D7c6", weight: 2 },
+  { move: "F5f6E6f4E3c5G5d3D6f7C4e2E7d7", weight: 2 },
+  { move: "F5d6C5f4E3c6D7e6F6d3C4b3B4", weight: 2 }
+
 ];

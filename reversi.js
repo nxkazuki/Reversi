@@ -102,6 +102,12 @@ class ReversiGame {
 
     startBtn.addEventListener('click', () => this.startGame());
     resetBtn.addEventListener('click', () => this.resetGame());
+
+    // 以下の2つのリスナーを追加すると、チェックボックス切り替えが即座に反映されます
+    document.getElementById('showLegalMoves').addEventListener('change', () => this.updateUI());
+    const hintEl = document.getElementById('showAIHint');
+    if (hintEl) hintEl.addEventListener('change', () => this.updateUI());
+
     this.updateUI();
   }
 
@@ -206,11 +212,27 @@ class ReversiGame {
     document.getElementById('statusMessage').textContent = resultStr;
   }
 
-  updateUI() {
+updateUI() {
     let blackCount = 0;
     let whiteCount = 0;
     const showLegal = document.getElementById('showLegalMoves').checked;
+    
+    // ヒントのチェックボックス要素を取得（存在しない場合はfalse）
+    const hintEl = document.getElementById('showAIHint');
+    const showHint = hintEl ? hintEl.checked : false;
+    
     const legalMoves = this.getLegalMoves(this.board, this.currentTurn);
+
+    // 人間の手番かつヒント表示がONの場合、AIの最善手を計算
+    let aiBestMove = null;
+    if (this.gameActive && this.currentTurn === this.humanPlayer && showHint && legalMoves.length > 0) {
+      // 難易度2（高）のロジックを使って、現在の盤面でのベストな1手を算出
+      // （探索時間を一瞬にするため、一時的にMAX_SEARCH_TIMEを短く制御してもOKですが、現在の3.5秒以内でも非同期の隙間に計算可能です）
+      const savedTime = this.MAX_SEARCH_TIME;
+      this.MAX_SEARCH_TIME = 800; // ヒント計算用は0.8秒に制限してサクサク動かす
+      aiBestMove = this.selectBestMove(this.board, this.currentTurn);
+      this.MAX_SEARCH_TIME = savedTime; // 元に戻す
+    }
 
     for (let r = 1; r <= 8; r++) {
       for (let c = 1; c <= 8; c++) {
@@ -219,6 +241,7 @@ class ReversiGame {
 
         cell.innerHTML = '';
         cell.classList.remove('legal-move');
+        cell.classList.remove('ai-hint'); // 前のヒントクラスをクリア
 
         const state = this.board[r][c];
         if (state === ReversiGame.BLACK) {
@@ -231,10 +254,15 @@ class ReversiGame {
           const disc = document.createElement('div');
           disc.className = 'disc white';
           cell.appendChild(disc);
-        } else if (this.gameActive && this.currentTurn === this.humanPlayer && showLegal) {
-          const isLegal = legalMoves.some(m => m.row === r && m.col === c);
-          if (isLegal) {
-            cell.classList.add('legal-move');
+        } else if (this.gameActive && this.currentTurn === this.humanPlayer) {
+          // AIのヒント該当マスであれば青ドットを表示（着手可能ドットより優先）
+          if (aiBestMove && aiBestMove.row === r && aiBestMove.col === c) {
+            cell.classList.add('ai-hint');
+          } else if (showLegal) {
+            const isLegal = legalMoves.some(m => m.row === r && m.col === c);
+            if (isLegal) {
+              cell.classList.add('legal-move');
+            }
           }
         }
       }
