@@ -27,6 +27,20 @@
             <div class="game-controls">
                 <form id="gameConfigForm" onsubmit="return false;">
                     <div class="control-group">
+
+                        <fieldset>
+                            <legend>アシスト表示</legend>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="showLegalMoves" checked>
+                                    着手可能手を表示
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="showAIHint">
+                                        AIのおすすめ手（ヒント）を表示
+                                </label>
+                            </div>
+                        </fieldset>
                         <fieldset>
                             <legend>自分の石の色</legend>
                             <div class="radio-group">
