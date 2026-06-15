@@ -63,8 +63,9 @@ class ReversiGame {
 
     this.searchStartTime = 0;
     this.searchTimeout = false;
-    this.MAX_SEARCH_TIME = 3500; // 最大考慮時間 (3.5秒)
-    this.lastAIMove = null;        // 新規追加
+    this.MAX_SEARCH_TIME = 3500;  // 最大考慮時間 (3.5秒)
+    this.lastAIMove = null;       //AIの最後の着手を記録（強調表示用）
+    this.searchNodes = 0;         //ノードカウンター
   }
 
   getRandom64() {
@@ -608,7 +609,8 @@ updateUI() {
 
       this.searchStartTime = Date.now();
       this.searchTimeout = false;
-      this.transpositionTable.fill(null);
+      this.searchNodes = 0; // 探索開始時にリセット
+      this.transpositionTable = new Array(Number(ReversiGame.TT_SIZE)).fill(null); // 探索開始時に置換表をリセット
 
       const isBlackTurn = (color === ReversiGame.BLACK);
       let absoluteBestMoveMask = null;
@@ -660,7 +662,8 @@ updateUI() {
   }
 
   negamaxBitboard(P, O, depth, alpha, beta, perfect, moveCount, isBlackTurn) {
-    if ((moveCount % 512 === 0) && (Date.now() - this.searchStartTime > this.MAX_SEARCH_TIME)) {
+    this.searchNodes++;
+    if ((this.searchNodes & 511) === 0 && (Date.now() - this.searchStartTime > this.MAX_SEARCH_TIME)) {
       this.searchTimeout = true;
       return alpha;
     }
@@ -895,19 +898,25 @@ updateUI() {
   // 近傍石カウント（potentialMobility用） - 修正版
   getNeighborCount(P, pos) {
     let count = 0;
-    // 左右・上下・斜めの純粋なシフト量（すべて正の数）
-    const leftShifts = [1n, 7n, 8n, 9n];
-    const rightShifts = [1n, 7n, 8n, 9n];
     
-    for (const s of leftShifts) {
-      if (((pos << s) & P) !== 0n) count++;
-    }
-    for (const s of rightShifts) {
-      if (((pos >> s) & P) !== 0n) count++;
-    }
+    // 修正: 端をまたがないように安全なマスクを適用
+    const maskLeft  = 0xfefefefefefefefen; // 左端をクリア
+    const maskRight = 0x7f7f7f7f7f7f7f7fn; // 右端をクリア
+
+    // pos << 1n (左), pos << 7n (右下), pos << 8n (下), pos << 9n (左下)
+    if (((pos << 1n) & maskLeft & P) !== 0n) count++;
+    if (((pos << 7n) & maskRight & P) !== 0n) count++;
+    if (((pos << 8n) & P) !== 0n) count++;
+    if (((pos << 9n) & maskLeft & P) !== 0n) count++;
+
+    // pos >> 1n (右), pos >> 7n (左上), pos >> 8n (上), pos >> 9n (右上)
+    if (((pos >> 1n) & maskRight & P) !== 0n) count++;
+    if (((pos >> 7n) & maskLeft & P) !== 0n) count++;
+    if (((pos >> 8n) & P) !== 0n) count++;
+    if (((pos >> 9n) & maskRight & P) !== 0n) count++;
+
     return count;
   }
-
 
   cloneBoard(board) {
     return board.map(row => [...row]);
