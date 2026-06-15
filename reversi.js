@@ -55,7 +55,8 @@ class ReversiGame {
 
     this.zobristTable = Array(64).fill(null).map(() => [this.getRandom64(), this.getRandom64()]);
     this.zobristPlayer = this.getRandom64();
-    this.transpositionTable = Array(Number(ReversiGame.TT_SIZE)).fill(null);
+    // constructor() 内で
+    this.transpositionTable = new Array(Number(ReversiGame.TT_SIZE)).fill(null); 
 
     this.moveHistory = [];
     this.moveCount = 0;
@@ -63,6 +64,7 @@ class ReversiGame {
     this.searchStartTime = 0;
     this.searchTimeout = false;
     this.MAX_SEARCH_TIME = 3500; // 最大考慮時間 (3.5秒)
+    this.lastAIMove = null;        // 新規追加
   }
 
   getRandom64() {
@@ -152,6 +154,14 @@ class ReversiGame {
     this.placePiece(this.board, row, col, this.currentTurn);
     this.moveHistory.push({ row, col });
     this.moveCount++;
+
+    // AIが打った手を記録
+    if (this.currentTurn !== this.humanPlayer) {
+      this.lastAIMove = { row, col };
+    } else {
+      this.lastAIMove = null; // 人間の手は強調しない
+    }
+
     this.currentTurn = -this.currentTurn;
     this.updateUI();
 
@@ -216,22 +226,17 @@ updateUI() {
     let blackCount = 0;
     let whiteCount = 0;
     const showLegal = document.getElementById('showLegalMoves').checked;
-    
-    // ヒントのチェックボックス要素を取得（存在しない場合はfalse）
     const hintEl = document.getElementById('showAIHint');
     const showHint = hintEl ? hintEl.checked : false;
     
     const legalMoves = this.getLegalMoves(this.board, this.currentTurn);
 
-    // 人間の手番かつヒント表示がONの場合、AIの最善手を計算
     let aiBestMove = null;
     if (this.gameActive && this.currentTurn === this.humanPlayer && showHint && legalMoves.length > 0) {
-      // 難易度2（高）のロジックを使って、現在の盤面でのベストな1手を算出
-      // （探索時間を一瞬にするため、一時的にMAX_SEARCH_TIMEを短く制御してもOKですが、現在の3.5秒以内でも非同期の隙間に計算可能です）
       const savedTime = this.MAX_SEARCH_TIME;
-      this.MAX_SEARCH_TIME = 800; // ヒント計算用は0.8秒に制限してサクサク動かす
+      this.MAX_SEARCH_TIME = 800;
       aiBestMove = this.selectBestMove(this.board, this.currentTurn);
-      this.MAX_SEARCH_TIME = savedTime; // 元に戻す
+      this.MAX_SEARCH_TIME = savedTime;
     }
 
     for (let r = 1; r <= 8; r++) {
@@ -240,8 +245,7 @@ updateUI() {
         if (!cell) continue;
 
         cell.innerHTML = '';
-        cell.classList.remove('legal-move');
-        cell.classList.remove('ai-hint'); // 前のヒントクラスをクリア
+        cell.classList.remove('legal-move', 'ai-hint', 'last-ai-move'); // 強調クラスも削除
 
         const state = this.board[r][c];
         if (state === ReversiGame.BLACK) {
@@ -254,8 +258,15 @@ updateUI() {
           const disc = document.createElement('div');
           disc.className = 'disc white';
           cell.appendChild(disc);
-        } else if (this.gameActive && this.currentTurn === this.humanPlayer) {
-          // AIのヒント該当マスであれば青ドットを表示（着手可能ドットより優先）
+        }
+
+        // === AIの最後の着手を強調 ===
+        if (this.lastAIMove && this.lastAIMove.row === r && this.lastAIMove.col === c) {
+          cell.classList.add('last-ai-move');
+        }
+
+        // プレイヤーの手番のアシスト表示は別途行う
+        if (this.gameActive && this.currentTurn === this.humanPlayer) {
           if (aiBestMove && aiBestMove.row === r && aiBestMove.col === c) {
             cell.classList.add('ai-hint');
           } else if (showLegal) {
@@ -332,45 +343,117 @@ updateUI() {
     }
   }
 
-  // 【大幅改修】定石を最高優先度（最大ウェイト）最優先で厳選するロジック
-  getOpeningMove() {
-    if (typeof joseki === 'undefined' || !Array.isArray(joseki)) return null;
+  moveToNotation(move) {
+    const colChar = String.fromCharCode('A'.charCodeAt(0) + (move.col - 1));
+    return colChar + move.row;
+  }
 
-    let currentHistoryStr = this.moveHistory.map(m => {
-      const colStr = String.fromCharCode('a'.charCodeAt(0) + (m.col - 1));
-      const rowStr = m.row.toString();
-      return colStr.toUpperCase() + rowStr;
-    }).join('');
+  notationToMove(notation) {
+    if (!notation || notation.length < 2) return null;
+    const col = notation.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+    const row = parseInt(notation[1], 10);
+    if (row < 1 || row > 8 || col < 1 || col > 8) return null;
+    return { row, col };
+  }
+
+  transformMove(move, transformName) {
+    const { row, col } = move;
+    switch (transformName) {
+      case 'rot90': return { row: col, col: 9 - row };
+      case 'rot180': return { row: 9 - row, col: 9 - col };
+      case 'rot270': return { row: 9 - col, col: row };
+      case 'mirrorV': return { row, col: 9 - col };
+      case 'mirrorH': return { row: 9 - row, col };
+      case 'diagMain': return { row: col, col: row };
+      case 'diagAnti': return { row: 9 - col, col: 9 - row };
+      case 'identity':
+      default:
+        return { row, col };
+    }
+  }
+
+  getOpeningTransforms() {
+    return [
+      { name: 'identity', inverse: 'identity' },
+      { name: 'rot90', inverse: 'rot270' },
+      { name: 'rot180', inverse: 'rot180' },
+      { name: 'rot270', inverse: 'rot90' },
+      { name: 'mirrorV', inverse: 'mirrorV' },
+      { name: 'mirrorH', inverse: 'mirrorH' },
+      { name: 'diagMain', inverse: 'diagMain' },
+      { name: 'diagAnti', inverse: 'diagAnti' }
+    ];
+  }
+
+  getTransformedHistoryString(transformName) {
+    return this.moveHistory
+      .map(move => this.moveToNotation(this.transformMove(move, transformName)))
+      .join('');
+  }
+
+  getOpeningMove() {
+    if (typeof joseki === 'undefined' || !Array.isArray(joseki) || joseki.length === 0) {
+      console.warn("[定石] joseki データが見つかりません");
+      return null;
+    }
 
     let bestWeight = -1;
+    let bestLength = -1;
     let candidates = [];
+    const seenCandidates = new Set();
 
-    for (const item of joseki) {
-      const line = item.move;
-      const weight = item.weight || 1; 
+    const originalHistoryStr = this.moveHistory.map(move => this.moveToNotation(move)).join('');
+    console.log(`[定石検索] 現在手順: ${originalHistoryStr} (${this.moveHistory.length}手)`);
 
-      if (line.toUpperCase().startsWith(currentHistoryStr.toUpperCase()) && line.length > currentHistoryStr.length) {
-        let nextMoveStr = line.substr(currentHistoryStr.length, 2).toUpperCase();
-        let col = nextMoveStr.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
-        let row = parseInt(nextMoveStr.charAt(1));
+    for (const transform of this.getOpeningTransforms()) {
+      const currentHistoryStr = this.getTransformedHistoryString(transform.name);
+      const currentLen = currentHistoryStr.length;
 
-        if (this.canPlace(this.board, row, col, this.currentTurn)) {
-          // より高い優先度（weight）を見つけたら、これまでの下位候補を破棄して更新
-          if (weight > bestWeight) {
-            bestWeight = weight;
-            candidates = [{ row, col }];
-          } 
-          // 同等の最高ウェイトなら選択肢に追加（ランダムに分岐させゲーム性を維持）
-          else if (weight === bestWeight) {
-            candidates.push({ row, col });
-          }
+      for (const item of joseki) {
+        if (!item || typeof item.move !== 'string') continue;
+        const line = item.move.toUpperCase();
+        const weight = item.weight || 1;
+
+        if (line.length <= currentLen) continue;
+        if (line.substring(0, currentLen) !== currentHistoryStr) continue;
+
+        const bookMoveStr = line.substring(currentLen, currentLen + 2);
+        const bookMove = this.notationToMove(bookMoveStr);
+        if (!bookMove) continue;
+
+        const actualMove = this.transformMove(bookMove, transform.inverse);
+        if (!this.canPlace(this.board, actualMove.row, actualMove.col, this.currentTurn)) continue;
+
+        const key = `${actualMove.row},${actualMove.col}`;
+        if (seenCandidates.has(key)) continue;
+        seenCandidates.add(key);
+
+        const matchLength = line.length;
+
+        // 優先順位：weight > 手順の長さ
+        const isBetter = 
+          weight > bestWeight || 
+          (weight === bestWeight && matchLength > bestLength);
+
+        if (isBetter) {
+          bestWeight = weight;
+          bestLength = matchLength;
+          candidates = [{ ...actualMove, weight, transform: transform.name, matchLength }];
+        } else if (weight === bestWeight && matchLength === bestLength) {
+          candidates.push({ ...actualMove, weight, transform: transform.name, matchLength });
         }
       }
     }
 
     if (candidates.length > 0) {
-      return candidates[Math.floor(Math.random() * candidates.length)];
+      // 重みと長さが同じ場合はランダム選択
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      console.log(`✅ [定石ヒット] ${originalHistoryStr} → ${this.moveToNotation(chosen)} ` +
+                  `(weight:${chosen.weight}, length:${chosen.matchLength}, transform:${chosen.transform})`);
+      return { row: chosen.row, col: chosen.col };
     }
+
+    console.log(`❌ [定石未ヒット] 手順 "${originalHistoryStr}" にマッチする定石なし`);
     return null;
   }
 
@@ -508,16 +591,19 @@ updateUI() {
     }
 
     if (this.difficulty === 2) {
-      // 序盤12手目までは厳選された最善定石を採用
-      if (this.moveCount < 12) {
+      // 序盤20手目くらいまで定石を積極的に使用（余裕を持たせる）
+      if (this.moveCount < 20) {
         const openingMove = this.getOpeningMove();
         if (openingMove) return openingMove;
       }
 
+      // 定石が使えなかった場合は探索へ
+      console.log(`[探索モード] moveCount=${this.moveCount} で定石未使用`);
+
       const { p, o } = this.boardToBitboard(board, color);
       const empty = 64 - this.popcount(p | o);
       
-      const isPerfect = (empty <= 17); 
+      const isPerfect = (empty <= 20);   // 17 → 20 に拡張
       const maxDepth = isPerfect ? empty : 60; 
 
       this.searchStartTime = Date.now();
@@ -591,13 +677,18 @@ updateUI() {
 
     let moves = this.getOrderedMovesBitboard(P, O, hash);
 
-    if (depth <= 0 || moves.length === 0) {
-      if (moves.length === 0 && this.getLegalMovesBitboard(O, P) !== 0n) {
-        return -this.negamaxBitboard(O, P, depth, -beta, -alpha, perfect, moveCount, !isBlackTurn);
+    if (moves.length === 0) {
+      if (this.getLegalMovesBitboard(O, P) !== 0n) {
+        // 深さを1減らして相手の探索へ（perfectフラグは維持）
+        return -this.negamaxBitboard(O, P, depth - 1, -beta, -alpha, perfect, moveCount, !isBlackTurn);
       }
-      if (perfect) {
-        return (this.popcount(P) - this.popcount(O)) * 10000;
-      }
+      // 両者パス（完全な終局）
+      const stoneDiff = this.popcount(P) - this.popcount(O);
+      return stoneDiff * 100000; // 確定した勝敗・石数差なので超巨大な値を返す
+    }
+
+    if (depth <= 0) {
+      // 探索深さの上限に達した場合は、通常の評価関数を返す
       return this.searchEvaluatorBitboard(P, O, moveCount);
     }
 
@@ -631,13 +722,17 @@ updateUI() {
     if (bestScore <= originalAlpha) type = ReversiGame.UPPERBOUND;
     else if (bestScore >= beta) type = ReversiGame.LOWERBOUND;
 
-    this.transpositionTable[idx] = {
-      hash: hash,
-      score: bestScore,
-      depth: depth,
-      type: type,
-      bestMove: bestMove
-    };
+    const existing = this.transpositionTable[idx];
+    // 既存のデータがない、または新しいデータの方が深く探索している場合のみ上書き
+    if (!existing || depth >= existing.depth) {
+      this.transpositionTable[idx] = {
+        hash: hash,
+        score: bestScore,
+        depth: depth,
+        type: type,
+        bestMove: bestMove
+      };
+    }
 
     return bestScore;
   }
@@ -663,20 +758,23 @@ updateUI() {
       const flatIdx = this.bitboardToIdx(move);
       const cellScore = ReversiGame.CELL_POINTS_64[flatIdx];
       
-      let score;
+      const flipped = this.getFlipBitboard(P, O, move);
+      const flipCount = this.popcount(flipped);
+      
+      let score = cellScore * 1.2 + flipCount * 450;  // 捕獲重視
+      
       if (bestMoveMask && move === bestMoveMask) {
-        score = 1000000;
+        score += 2000000;  // TT最善手を最優先
       } else {
-        const flipped = this.getFlipBitboard(P, O, move);
         const nextP = P | move | flipped;
         const nextO = O & ~flipped;
         
-        // 相手の機動力を削ぎ落とす評価比率を維持
-        score = cellScore
-              + this.popcount(this.getLegalMovesBitboard(nextP, nextO)) * 200
-              - this.popcount(this.getLegalMovesBitboard(nextO, nextP)) * 800;
+        const myNextMob = this.popcount(this.getLegalMovesBitboard(nextP, nextO));
+        const oppNextMob = this.popcount(this.getLegalMovesBitboard(nextO, nextP));
+        
+        score += myNextMob * 180 - oppNextMob * 650;
       }
-                  
+      
       moves.push({ mask: move, score });
     }
     
@@ -688,46 +786,48 @@ updateUI() {
 
   searchEvaluatorBitboard(P, O, moveCount) {
     const emptyCount = 64 - this.popcount(P | O);
-    const isEndgame = emptyCount <= 20;
+    const isMidgame = emptyCount > 20;
+    const isEndgame = emptyCount <= 14;  // より早めに石数重視に
 
     let score = 0;
 
-    // 1. 位置評価（基本）
+    // 1. 位置評価（基本） - ウェイトを少し調整
     for (let i = 0; i < 64; i++) {
       if ((P & ReversiGame.POW2_64[i]) !== 0n) {
         score += ReversiGame.CELL_POINTS_64[i];
       } else if ((O & ReversiGame.POW2_64[i]) !== 0n) {
-        score -= ReversiGame.CELL_POINTS_64[i];
+        score -= ReversiGame.CELL_POINTS_64[i] * 0.95; // 相手の悪い場所は少し軽減
       }
     }
 
-    // 2. 機動力評価（中盤重視）
+    // 2. 機動力評価（中盤重視 → 終盤は弱く）
     const myMobility = this.popcount(this.getLegalMovesBitboard(P, O));
     const oppMobility = this.popcount(this.getLegalMovesBitboard(O, P));
-    score += myMobility * 380;
-    score += oppMobility * -720;
+    const mobilityWeight = isEndgame ? 120 : 380;
+    score += myMobility * mobilityWeight;
+    score += oppMobility * (isEndgame ? -250 : -720);
 
-    // 3. 安定性評価（新機能）
-    score += this.stabilityScore(P, O) * (isEndgame ? 1.8 : 1.2);
-    score -= this.stabilityScore(O, P) * (isEndgame ? 1.8 : 1.2);
+    // 3. 安定性評価（大幅強化）
+    score += this.stabilityScore(P, O) * (isEndgame ? 2.2 : 1.3);
+    score -= this.stabilityScore(O, P) * (isEndgame ? 2.2 : 1.3);
 
     // 4. 辺・壁の連鎖評価
-    score += this.edgeStability(P, O) * 1.4;
-    score -= this.edgeStability(O, P) * 1.4;
+    score += this.edgeStability(P, O) * (isEndgame ? 2.0 : 1.4);
+    score -= this.edgeStability(O, P) * (isEndgame ? 2.0 : 1.4);
 
-    // 5. 潜在的機動力
-    score += this.potentialMobility(P, O) * 90;
-    score -= this.potentialMobility(O, P) * 110;
+    // 5. 潜在的機動力（修正済み関数使用）
+    score += this.potentialMobility(P, O) * (isMidgame ? 110 : 60);
+    score -= this.potentialMobility(O, P) * (isMidgame ? 130 : 80);
 
     // 6. パリティ評価（終盤重要）
-    if (emptyCount <= 12) {
-      const parity = (emptyCount % 2 === 0) ? 1800 : -1800;
+    if (emptyCount <= 16) {
+      const parity = (emptyCount % 2 === 0) ? 2200 : -2200;
       score += (moveCount % 2 === 0) ? parity : -parity;
     }
 
-    // 7. 終盤石数補正
-    if (isEndgame) {
-      score += (this.popcount(P) - this.popcount(O)) * 250;
+    // 7. 石数評価（より早めに強く）
+    if (emptyCount <= 18) {
+      score += (this.popcount(P) - this.popcount(O)) * 320;
     }
 
     return Math.round(score);
@@ -736,19 +836,18 @@ updateUI() {
 // 安定性評価（確定石・隅・辺の強固さ）
   stabilityScore(P, O) {
     let score = 0;
-    const corners = [0, 7, 56, 63]; // A1, H1, A8, H8
+    const corners = [0, 7, 56, 63];
 
-    // 隅の確定石
     corners.forEach(idx => {
-      if ((P & ReversiGame.POW2_64[idx]) !== 0n) score += 2800;
-      else if ((O & ReversiGame.POW2_64[idx]) !== 0n) score -= 2800;
+      if ((P & ReversiGame.POW2_64[idx]) !== 0n) score += 3200;
+      else if ((O & ReversiGame.POW2_64[idx]) !== 0n) score -= 3200;
     });
 
-    // 辺の確定石（簡易版）
+    // 辺の確定石（より多くの位置をカバー）
     const edges = [1,2,3,4,5,6, 8,16,24,32,40,48, 57,58,59,60,61,62, 15,23,31,39,47,55];
     edges.forEach(idx => {
-      if ((P & ReversiGame.POW2_64[idx]) !== 0n) score += 650;
-      else if ((O & ReversiGame.POW2_64[idx]) !== 0n) score -= 650;
+      if ((P & ReversiGame.POW2_64[idx]) !== 0n) score += 720;
+      else if ((O & ReversiGame.POW2_64[idx]) !== 0n) score -= 720;
     });
 
     return score;
@@ -793,13 +892,18 @@ updateUI() {
     return score;
   }
 
-  // 近傍石カウント（potentialMobility用）
+  // 近傍石カウント（potentialMobility用） - 修正版
   getNeighborCount(P, pos) {
     let count = 0;
-    const dirs = [1n, 7n, 8n, 9n, -1n, -7n, -8n, -9n];
-    for (const d of dirs) {
-      const n = (pos << BigInt(d > 0 ? d : -d)) | (pos >> BigInt(d < 0 ? -d : d)); // 簡易
-      if ((n & P) !== 0n) count++;
+    // 左右・上下・斜めの純粋なシフト量（すべて正の数）
+    const leftShifts = [1n, 7n, 8n, 9n];
+    const rightShifts = [1n, 7n, 8n, 9n];
+    
+    for (const s of leftShifts) {
+      if (((pos << s) & P) !== 0n) count++;
+    }
+    for (const s of rightShifts) {
+      if (((pos >> s) & P) !== 0n) count++;
     }
     return count;
   }
