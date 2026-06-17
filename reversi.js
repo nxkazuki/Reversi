@@ -592,8 +592,8 @@ updateUI() {
     }
 
     if (this.difficulty === 2) {
-      // 序盤20手目くらいまで定石を積極的に使用（余裕を持たせる）
-      if (this.moveCount < 20) {
+      // 序盤30手目くらいまで定石を積極的に使用（余裕を持たせる）
+      if (this.moveCount < 30) {
         const openingMove = this.getOpeningMove();
         if (openingMove) return openingMove;
       }
@@ -700,25 +700,74 @@ updateUI() {
     let bestMove = null;
 
     for (let i = 0; i < moves.length; i++) {
-      const move = moves[i].mask;
-      const flipped = this.getFlipBitboard(P, O, move);
-      const nextP = P | move | flipped;
-      const nextO = O & ~flipped;
 
-      const score = -this.negamaxBitboard(nextO, nextP, depth - 1, -beta, -alpha, perfect, moveCount + 1, !isBlackTurn);
+        const move = moves[i].mask;
 
-      if (this.searchTimeout) return alpha;
+        const flipped = this.getFlipBitboard(P, O, move);
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = move;
-      }
-      if (bestScore > alpha) {
-        alpha = bestScore;
-      }
-      if (alpha >= beta) {
-        break; 
-      }
+        const nextP = P | move | flipped;
+        const nextO = O & ~flipped;
+
+        let score;
+
+        if (i === 0) {
+
+            // PV手は通常探索
+            score = -this.negamaxBitboard(
+                nextO,
+                nextP,
+                depth - 1,
+                -beta,
+                -alpha,
+                perfect,
+                moveCount + 1,
+                !isBlackTurn
+            );
+
+        } else {
+
+            // Null Window Search
+            score = -this.negamaxBitboard(
+                nextO,
+                nextP,
+                depth - 1,
+                -alpha - 1,
+                -alpha,
+                perfect,
+                moveCount + 1,
+                !isBlackTurn
+            );
+
+            // fail-highなら再探索
+            if (score > alpha && score < beta) {
+
+                score = -this.negamaxBitboard(
+                    nextO,
+                    nextP,
+                    depth - 1,
+                    -beta,
+                    -score,
+                    perfect,
+                    moveCount + 1,
+                    !isBlackTurn
+                );
+            }
+        }
+
+        if (this.searchTimeout) return alpha;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+        }
+
+        if (score > alpha) {
+            alpha = score;
+        }
+
+        if (alpha >= beta) {
+            break;
+        }
     }
 
     let type = ReversiGame.EXACT;
