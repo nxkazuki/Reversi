@@ -603,22 +603,29 @@ updateUI() {
 
       const { p, o } = this.boardToBitboard(board, color);
       const empty = 64 - this.popcount(p | o);
-      
-      const isPerfect = (empty <= 20);   // 17 → 20 に拡張
-      const maxDepth = isPerfect ? empty : 60; 
 
       this.searchStartTime = Date.now();
       this.searchTimeout = false;
-      this.searchNodes = 0; // 探索開始時にリセット
-      this.transpositionTable = new Array(Number(ReversiGame.TT_SIZE)).fill(null); // 探索開始時に置換表をリセット
+      this.searchNodes = 0;
+      this.transpositionTable = new Array(Number(ReversiGame.TT_SIZE)).fill(null);
 
       const isBlackTurn = (color === ReversiGame.BLACK);
+
+      // ── 終盤完全読み切りルート（empty <= 24） ──────────────────
+      if (empty <= 24) {
+        console.log(`[終盤読み切り] 残り${empty}手 完全読み切り開始`);
+        const bestMask = this.solveEndgame(p, o, empty, isBlackTurn);
+        if (bestMask) return this.bitboardToCoords(bestMask);
+        return legalMoves[0];
+      }
+
+      // ── 中盤反復深化ルート ────────────────────────────────────
       let absoluteBestMoveMask = null;
-      
-      for (let currentDepth = 1; currentDepth <= maxDepth; currentDepth++) {
+
+      for (let currentDepth = 1; currentDepth <= 60; currentDepth++) {
         let bestMoveMaskThisIteration = null;
         let maxScore = -Infinity;
-        
+
         const currentHash = this.getHash(p, o, isBlackTurn);
         const ordered = this.getOrderedMovesBitboard(p, o, currentHash);
 
@@ -626,11 +633,11 @@ updateUI() {
           const flips = this.getFlipBitboard(p, o, move.mask);
           const nextP = p | move.mask | flips;
           const nextO = o & ~flips;
-          
+
           const score = -this.negamaxBitboard(
-            nextO, nextP, currentDepth - 1, 
-            -100000000, -maxScore, 
-            isPerfect, this.moveCount + 1, !isBlackTurn
+            nextO, nextP, currentDepth - 1,
+            -100000000, -maxScore,
+            false, this.moveCount + 1, !isBlackTurn
           );
 
           if (this.searchTimeout) break;
@@ -641,7 +648,7 @@ updateUI() {
           }
         }
 
-        if (this.searchTimeout) break; 
+        if (this.searchTimeout) break;
 
         if (bestMoveMaskThisIteration) {
           absoluteBestMoveMask = bestMoveMaskThisIteration;
@@ -682,12 +689,12 @@ updateUI() {
 
     if (moves.length === 0) {
       if (this.getLegalMovesBitboard(O, P) !== 0n) {
-        // 深さを1減らして相手の探索へ（perfectフラグは維持）
-        return -this.negamaxBitboard(O, P, depth - 1, -beta, -alpha, perfect, moveCount, !isBlackTurn);
+        // パスはdepthを消費しない（手を指していないため）
+        return -this.negamaxBitboard(O, P, depth, -beta, -alpha, perfect, moveCount, !isBlackTurn);
       }
       // 両者パス（完全な終局）
       const stoneDiff = this.popcount(P) - this.popcount(O);
-      return stoneDiff * 100000; // 確定した勝敗・石数差なので超巨大な値を返す
+      return stoneDiff * 100000;
     }
 
     if (depth <= 0) {
@@ -969,5 +976,170 @@ updateUI() {
 
   cloneBoard(board) {
     return board.map(row => [...row]);
+  }
+
+
+// ============================================================
+  // ■ 終盤完全読み切りエンジン
+  // ============================================================
+
+  /**
+   * 終盤読み切りのルートエントリ。
+   * WLD（勝ち/負け/引き分け判定）→ 石数最大化 の2段階で進める。
+   * @returns {BigInt|null} 最善手のビットマスク
+   */
+  solveEndgame(P, O, empty, isBlackTurn) {
+    const legal = this.getLegalMovesBitboard(P, O);
+    if (legal === 0n) return null;
+
+    // --- フェーズ1: WLD 先読みで候補を絞る ---
+    let bestMask = null;
+    let bestScore = -Infinity;
+
+    const moves = this.getEndgameMoves(P, O);
+
+    for (const { mask } of moves) {
+      const flips = this.getFlipBitboard(P, O, mask);
+      const nextP = P | mask | flips;
+      const nextO = O & ~flips;
+
+      const score = -this.endgameAlphaBeta(
+        nextO, nextP, empty - 1, -64, 64, !isBlackTurn
+      );
+
+      if (this.searchTimeout) break;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMask = mask;
+      }
+    }
+
+    const elapsed = Date.now() - this.searchStartTime;
+    console.log(`[終盤読み切り完了] スコア=${bestScore} ノード=${this.searchNodes} 時間=${elapsed}ms`);
+    return bestMask;
+  }
+
+  /**
+   * 終盤専用 Alpha-Beta（石数差を直接スコアとして扱う）
+   * depthではなくempty（残り空きマス数）で管理。
+   * パスはemptyを消費しない。
+   */
+  endgameAlphaBeta(P, O, empty, alpha, beta, isBlackTurn) {
+    this.searchNodes++;
+
+    // タイムアウトチェック（512ノードごと）
+    if ((this.searchNodes & 511) === 0) {
+      if (Date.now() - this.searchStartTime > this.MAX_SEARCH_TIME) {
+        this.searchTimeout = true;
+        return alpha;
+      }
+    }
+
+    // 終局判定
+    if (empty === 0) {
+      return this.popcount(P) - this.popcount(O);
+    }
+
+    const hash = this.getHash(P, O, isBlackTurn);
+    const idx = Number(hash % ReversiGame.TT_SIZE);
+    const cached = this.transpositionTable[idx];
+    if (cached && cached.hash === hash && cached.depth >= empty) {
+      if (cached.type === ReversiGame.EXACT)      return cached.score;
+      if (cached.type === ReversiGame.UPPERBOUND && cached.score <= alpha) return alpha;
+      if (cached.type === ReversiGame.LOWERBOUND && cached.score >= beta)  return beta;
+    }
+
+    const moves = this.getEndgameMoves(P, O);
+
+    if (moves.length === 0) {
+      // パス：相手の手番へ（emptyは変わらない）
+      if (this.getLegalMovesBitboard(O, P) !== 0n) {
+        return -this.endgameAlphaBeta(O, P, empty, -beta, -alpha, !isBlackTurn);
+      }
+      // 完全終局
+      return this.popcount(P) - this.popcount(O);
+    }
+
+    let bestScore = -65;
+    let originalAlpha = alpha;
+    let bestMoveMask = null;
+
+    for (let i = 0; i < moves.length; i++) {
+      const move = moves[i].mask;
+      const flips = this.getFlipBitboard(P, O, move);
+      const nextP = P | move | flips;
+      const nextO = O & ~flips;
+
+      let score;
+      if (i === 0) {
+        score = -this.endgameAlphaBeta(nextO, nextP, empty - 1, -beta, -alpha, !isBlackTurn);
+      } else {
+        // Null Window Search
+        score = -this.endgameAlphaBeta(nextO, nextP, empty - 1, -alpha - 1, -alpha, !isBlackTurn);
+        if (!this.searchTimeout && score > alpha && score < beta) {
+          score = -this.endgameAlphaBeta(nextO, nextP, empty - 1, -beta, -score, !isBlackTurn);
+        }
+      }
+
+      if (this.searchTimeout) return alpha;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMoveMask = move;
+      }
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) break;
+    }
+
+    // 置換表に登録
+    let type = ReversiGame.EXACT;
+    if (bestScore <= originalAlpha) type = ReversiGame.UPPERBOUND;
+    else if (bestScore >= beta)     type = ReversiGame.LOWERBOUND;
+
+    const existing = this.transpositionTable[idx];
+    if (!existing || empty >= existing.depth) {
+      this.transpositionTable[idx] = {
+        hash, score: bestScore, depth: empty,
+        type, bestMove: bestMoveMask
+      };
+    }
+
+    return bestScore;
+  }
+
+  /**
+   * 終盤専用の手順整列。
+   * 評価関数を呼ばず、隅優先・flipCount重視の軽量ソート。
+   */
+  getEndgameMoves(P, O) {
+    const legal = this.getLegalMovesBitboard(P, O);
+    if (legal === 0n) return [];
+
+    // 置換表ベストムーブを先頭に
+    const moves = [];
+    let temp = legal;
+    while (temp > 0n) {
+      const move = temp & -temp;
+      temp &= temp - 1n;
+
+      const idx = this.bitboardToIdx(move);
+      const flips = this.getFlipBitboard(P, O, move);
+      const flipCount = this.popcount(flips);
+
+      // 隅（idx 0,7,56,63）は最優先
+      const isCorner = (idx === 0 || idx === 7 || idx === 56 || idx === 63);
+      // X打ち（idx 9,14,49,54）は最悪手
+      const isXsquare = (idx === 9 || idx === 14 || idx === 49 || idx === 54);
+
+      let score = flipCount * 10;
+      if (isCorner)  score += 10000;
+      if (isXsquare) score -= 5000;
+
+      moves.push({ mask: move, score });
+    }
+
+    moves.sort((a, b) => b.score - a.score);
+    return moves;
   }
 }
