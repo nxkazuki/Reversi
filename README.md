@@ -15,9 +15,11 @@ A high-performance, algorithm-driven Reversi AI engine implemented in JavaScript
 2. 高度な探索アルゴリズム
 Negamax法 & Alpha-Beta pruning: 広大な探索木から無駄な枝を効率的に刈り取り、短時間で質の高い手を選択します。
 Transposition Table (置き換えテーブル): 一度計算した盤面の状態を記憶し、再計算を防ぐことで探索の深さを最大化します。
+
 3. 高速化のための最適化
 Zobrist Hashing: 複雑な盤面状態を一意の数値に変換し、高速なハッシュ管理を実現。
 TypedArrayによるメモリ最適化: Uint8Array や BigUint64Array を用いて評価テーブルを構築。JavaScriptエンジンにおけるガベージコレクションの負荷を抑えつつ、CPUキャッシュ効率を向上させています。
+
 4. 定式（Joseki）の動的統合
 あらかじめ定義された**「定式データ（Opening Book）」**を搭載。序盤において、高度な戦略（Tiger, Buffalo, Rose等）に基づいた最適な布陣を選択し、人間が陥りやすい「序盤の罠」を回避します。
 
