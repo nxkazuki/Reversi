@@ -55,17 +55,22 @@ class ReversiGame {
 
     this.zobristTable = Array(64).fill(null).map(() => [this.getRandom64(), this.getRandom64()]);
     this.zobristPlayer = this.getRandom64();
-    // constructor() 内で
-    this.transpositionTable = new Array(Number(ReversiGame.TT_SIZE)).fill(null); 
 
+    // 【変更箇所】オブジェクトの配列をTypedArrayのセットに置き換え
+    // TypedArrayはメモリを連続して確保するため、アクセスが圧倒的に高速です。
+    // 各フィールドを適切な型（BigUint64, Int32, Uint8）で定義します。
+    this.ttHashes = new BigUint64Array(Number(ReversiGame.TT_SIZE)); // ハッシュ値用
+    this.ttScores = new Int32Array(Number(ReversiGame.TT_SIZE));      // スコア用
+    this.ttDepths = new Uint8Array(Number(ReversiGame.TT_SIZE));       // 深さ（0-255あれば十分）
+    this.ttTypes = new Uint8Array(Number(ReversiGame.TT_SIZE));         // タイプ（0, 1, 2）
+    this.ttBestMoves = new BigUint64Array(Number(ReversiGame.TT_SIZE)); // ベストムーブ用マスク
+    
     this.moveHistory = [];
     this.moveCount = 0;
 
     this.searchStartTime = 0;
     this.searchTimeout = false;
-    this.MAX_SEARCH_TIME = 3500;  // 最大考慮時間 (3.5秒)
-    this.lastAIMove = null;       //AIの最後の着手を記録（強調表示用）
-    this.searchNodes = 0;         //ノードカウンター
+    this.MAX_SEARCH_TIME = 3500;
   }
 
   getRandom64() {
@@ -670,34 +675,35 @@ updateUI() {
 
     const hash = this.getHash(P, O, isBlackTurn);
     const idx = Number(hash % ReversiGame.TT_SIZE);
-    const cached = this.transpositionTable[idx];
+
+    // --- 【変更箇所】データの読み取りをTypedArrayから行う ---
+    // 元々の「cached」オブジェクトを取得する代わりに、直接配列を参照します。
+    const cachedHash = this.ttHashes[idx];
+    const currentDepth = this.ttDepths[idx];
+    const entryType = this.ttTypes[idx];
     
-    if (cached && cached.hash === hash && cached.depth >= depth) {
-      if (cached.type === ReversiGame.EXACT) return cached.score;
-      if (cached.type === ReversiGame.UPPERBOUND && cached.score <= alpha) return alpha;
-      if (cached.type === ReversiGame.LOWERBOUND && cached.score >= beta) return beta;
+    // ハッシュが0でない（初期値ではない）かつ、型が一致しているか確認
+    if (cachedHash !== 0n && cachedHash === hash && currentDepth >= depth) {
+      if (entryType === ReversiGame.EXACT) return this.ttScores[idx];
+      if (entryType === ReversiGame.UPPERBOUND && this.ttScores[idx] <= alpha) return alpha;
+      if (entryType === ReversiGame.LOWERBOUND && this.ttScores[idx] >= beta) return beta;
     }
 
     let moves = this.getOrderedMovesBitboard(P, O, hash);
 
-    if (moves.length === 0) {
-      if (this.getLegalMovesBitboard(O, P) !== 0n) {
-        // 深さを1減らして相手の探索へ（perfectフラグは維持）
-        return -this.negamaxBitboard(O, P, depth - 1, -beta, -alpha, perfect, moveCount, !isBlackTurn);
+    if (depth <= 0 || moves.length === 0) {
+      if (moves.length === 0 && this.getLegalMovesBitboard(O, P) !== 0n) {
+        return -this.negamaxBitboard(O, P, depth, -beta, -alpha, perfect, moveCount, !isBlackTurn);
       }
-      // 両者パス（完全な終局）
-      const stoneDiff = this.popcount(P) - this.popcount(O);
-      return stoneDiff * 100000; // 確定した勝敗・石数差なので超巨大な値を返す
-    }
-
-    if (depth <= 0) {
-      // 探索深さの上限に達した場合は、通常の評価関数を返す
+      if (perfect) {
+        return (this.popcount(P) - this.popcount(O)) * 10000;
+      }
       return this.searchEvaluatorBitboard(P, O, moveCount);
     }
 
     let bestScore = -Infinity;
     let originalAlpha = alpha;
-    let bestMove = null;
+    let bestMoveMask = null; // 変数名をより正確に。
 
     for (let i = 0; i < moves.length; i++) {
       const move = moves[i].mask;
@@ -711,7 +717,7 @@ updateUI() {
 
       if (score > bestScore) {
         bestScore = score;
-        bestMove = move;
+        bestMoveMask = move;
       }
       if (bestScore > alpha) {
         alpha = bestScore;
@@ -721,21 +727,17 @@ updateUI() {
       }
     }
 
+    // --- 【変更箇所】データの書き込みをTypedArrayに反映 */}
     let type = ReversiGame.EXACT;
     if (bestScore <= originalAlpha) type = ReversiGame.UPPERBOUND;
     else if (bestScore >= beta) type = ReversiGame.LOWERBOUND;
 
-    const existing = this.transpositionTable[idx];
-    // 既存のデータがない、または新しいデータの方が深く探索している場合のみ上書き
-    if (!existing || depth >= existing.depth) {
-      this.transpositionTable[idx] = {
-        hash: hash,
-        score: bestScore,
-        depth: depth,
-        type: type,
-        bestMove: bestMove
-      };
-    }
+    // オブジェクトを作らず、各TypedArrayに値を格納
+    this.ttHashes[idx] = hash;
+    this.ttScores[idx] = bestScore;
+    this.ttDepths[idx] = depth;
+    this.ttTypes[idx] = type;
+    this.ttBestMoves[idx] = bestMoveMask ? BigInt(bestMoveMask) : 0n; // moveがBigIntであることを考慮
 
     return bestScore;
   }
@@ -747,37 +749,33 @@ updateUI() {
     let bestMoveMask = null;
     if (currentHash !== undefined) {
       const idx = Number(currentHash % ReversiGame.TT_SIZE);
-      const entry = this.transpositionTable[idx];
-      if (entry && entry.hash === currentHash) {
-        bestMoveMask = entry.bestMove;
+      // TypedArrayから直接bestMoveを取得
+      if (this.ttHashes[idx] === currentHash) {
+        bestMoveMask = this.ttBestMoves[idx];
       }
     }
     
     let temp = legal;
     while (temp > 0n) {
-      const move = temp & -temp;
+      const move = temp & -temp; // ここはBitmaskのまま計算に利用されるためそのまま保持
       temp &= temp - 1n;
       
       const flatIdx = this.bitboardToIdx(move);
       const cellScore = ReversiGame.CELL_POINTS_64[flatIdx];
       
-      const flipped = this.getFlipBitboard(P, O, move);
-      const flipCount = this.popcount(flipped);
-      
-      let score = cellScore * 1.2 + flipCount * 450;  // 捕獲重視
-      
+      let score;
       if (bestMoveMask && move === bestMoveMask) {
-        score += 2000000;  // TT最善手を最優先
+        score = 1000000; // 良質な手であると判断されるためスコアを高くする
       } else {
+        const flipped = this.getFlipBitboard(P, O, move);
         const nextP = P | move | flipped;
         const nextO = O & ~flipped;
         
-        const myNextMob = this.popcount(this.getLegalMovesBitboard(nextP, nextO));
-        const oppNextMob = this.popcount(this.getLegalMovesBitboard(nextO, nextP));
-        
-        score += myNextMob * 180 - oppNextMob * 650;
+        score = cellScore
+                + this.popcount(this.getLegalMovesBitboard(nextP, nextO)) * 200
+                - this.popcount(this.getLegalMovesBitboard(nextO, nextP)) * 800;
       }
-      
+                  
       moves.push({ mask: move, score });
     }
     
