@@ -102,8 +102,6 @@ const joseki = [
   { move: "F5f6E6f4E3c5G5d3D6f7C4e2E7d7", weight: 2 },
   { move: "F5d6C5f4E3c6D7e6F6d3C4b3B4", weight: 2 },
 
-  // ==================== 追加推奨定石（2026年最新傾向ベース） ====================
-
   // === Tiger 系 さらに深い進行 ===
   { move: "F5d6C3d3C4f4C5b3C2b4E3e6C6f6A5a4B5a6D7c7E7e8B6d8G3f7G5f3D2", weight: 3 },
   { move: "F5d6C3d3C4b3C6b6D7e8C2e6F6d2E7c6", weight: 3 },
